@@ -55,9 +55,12 @@ file). Each supported adapter records a new event and immediately attempts
 Telegram delivery; an unavailable channel never blocks the originating agent.
 
 Schedule a known future event locally with `sentinel schedule --id <event-id>
---at <ISO-8601 timestamp>`, then run `sentinel run-due` from your platform's
-scheduler. Each attempt and outcome is retained in local state and visible via
+--at <ISO-8601 timestamp>`, then install the per-user delivery runner with
+`sentinel scheduler install`. It checks for due events once a minute on macOS
+and Linux. Each attempt and outcome is retained in local state and visible via
 `sentinel deliveries --json`; failed delivery remains pending for retry.
+The installer resolves the currently installed `sentinel` executable; pass
+`--executable /absolute/path/to/sentinel` when using a nonstandard environment.
 
 ## Safe hook setup
 
@@ -88,8 +91,7 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Platform scheduler installation and `doctor` workflows for
-   macOS, Linux, and Windows.
+1. Windows scheduler installation and `doctor` workflows.
 2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
 
@@ -107,5 +109,6 @@ See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
 See [Gemini CLI adapter setup](docs/gemini-cli.md) for its supported events.
 See [Codex setup](docs/codex.md), [Grok setup](docs/grok.md), and the full
 [integration matrix](docs/integration-matrix.md) for adapter support status.
+See [local scheduler setup](docs/local-scheduler.md) for durable reset delivery.
 OpenCode and Aider setup are available in [the OpenCode guide](docs/opencode.md)
 and [the Aider guide](docs/aider.md).

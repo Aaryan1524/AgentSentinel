@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -13,7 +14,14 @@ from .channels import TelegramChannel
 from .core.models import Confidence, Event, EventKind
 from .core.scheduler import LocalScheduler
 from .core.store import EventStore
-from .installers import apply_hooks, detect_adapters, remove_hooks
+from .installers import (
+    apply_hooks,
+    detect_adapters,
+    install_scheduler,
+    remove_hooks,
+    scheduler_paths,
+    uninstall_scheduler,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -67,6 +75,23 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall.add_argument("--adapter", choices=["claude-code", "gemini-cli"], action="append")
     uninstall.add_argument("--dry-run", action="store_true", help="Show changes without editing settings")
     uninstall.add_argument("--home", help="Override home directory, useful for automation and tests")
+
+    scheduler = subcommands.add_parser("scheduler", help="Install or inspect the local due-delivery runner")
+    scheduler_commands = scheduler.add_subparsers(dest="scheduler_command", required=True)
+    install_scheduler_command = scheduler_commands.add_parser("install")
+    install_scheduler_command.add_argument("--dry-run", action="store_true", help="Show changes without writing files")
+    install_scheduler_command.add_argument("--home", help="Override home directory, useful for automation and tests")
+    install_scheduler_command.add_argument(
+        "--no-activate", action="store_true", help="Write configuration without activating it now"
+    )
+    install_scheduler_command.add_argument(
+        "--executable", help="Absolute Sentinel executable path for the background runner"
+    )
+    uninstall_scheduler_command = scheduler_commands.add_parser("uninstall")
+    uninstall_scheduler_command.add_argument("--dry-run", action="store_true", help="Show changes without writing files")
+    uninstall_scheduler_command.add_argument("--home", help="Override home directory, useful for automation and tests")
+    status_scheduler = scheduler_commands.add_parser("status")
+    status_scheduler.add_argument("--home", help="Override home directory, useful for automation and tests")
     return parser
 
 
@@ -226,6 +251,38 @@ def _uninstall(args: argparse.Namespace) -> int:
     return 0
 
 
+def _scheduler(args: argparse.Namespace) -> int:
+    home = Path(args.home).expanduser() if getattr(args, "home", None) else None
+    if args.scheduler_command == "status":
+        paths = scheduler_paths(home)
+        print(json.dumps({"paths": [str(path) for path in paths], "installed": all(path.exists() for path in paths)}))
+        return 0
+    if args.scheduler_command == "install":
+        executable = args.executable or shutil.which("sentinel") or "sentinel"
+        result = install_scheduler(
+            home=home,
+            executable=executable,
+            dry_run=args.dry_run,
+            activate=not args.no_activate,
+        )
+    else:
+        result = uninstall_scheduler(home=home, dry_run=args.dry_run)
+    print(
+        json.dumps(
+            {
+                "platform": result.platform,
+                "paths": [str(path) for path in result.paths],
+                "changed": result.changed,
+                "backups": [str(path) for path in result.backups],
+                "activated": result.activated,
+                "dry_run": args.dry_run,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -234,6 +291,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _init(args)
         if args.command == "uninstall":
             return _uninstall(args)
+        if args.command == "scheduler":
+            return _scheduler(args)
         store = EventStore()
         if args.command == "emit":
             return _emit(args, store)
