@@ -48,6 +48,13 @@ Schedule a known future event locally with `sentinel schedule --id <event-id>
 scheduler. Each attempt and outcome is retained in local state and visible via
 `sentinel deliveries --json`; failed delivery remains pending for retry.
 
+## Safe hook setup
+
+Run `sentinel init --detect --dry-run` to preview configuration for detected
+Claude Code and Gemini CLI settings. Remove `--dry-run` to apply only the
+missing Agent Sentinel hook groups. Existing configuration is preserved and a
+timestamped backup is written beside each changed settings file.
+
 Runtime state defaults to `~/.agent-sentinel/state.sqlite3`. Set
 `AGENT_SENTINEL_STATE` to use another path, for example in tests or a managed
 installation.
@@ -66,9 +73,9 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Safe `sentinel init --detect`, `doctor`, and `uninstall` workflows for
+1. Platform scheduler installation, `doctor`, and `uninstall` workflows for
    macOS, Linux, and Windows.
-4. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
+2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
 
 The local CLI will remain useful without Sentinel Cloud.
