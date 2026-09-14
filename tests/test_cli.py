@@ -93,3 +93,14 @@ class CliTests(unittest.TestCase):
         self.assertTrue(result["changed"])
         self.assertFalse(result["activated"])
         self.assertTrue(result["dry_run"])
+
+    def test_doctor_reports_setup_gaps_without_sending(self) -> None:
+        with TemporaryDirectory() as directory:
+            output = StringIO()
+            with patch("agent_sentinel.cli.scheduler_is_installed", return_value=False):
+                with redirect_stdout(output):
+                    self.assertEqual(main(["doctor", "--home", directory, "--json"]), 0)
+
+        result = json.loads(output.getvalue())
+        self.assertFalse(result["healthy"])
+        self.assertIn("telegram", {check["name"] for check in result["checks"]})

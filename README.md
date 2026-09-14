@@ -62,6 +62,9 @@ and Linux. Each attempt and outcome is retained in local state and visible via
 The installer resolves the currently installed `sentinel` executable; pass
 `--executable /absolute/path/to/sentinel` when using a nonstandard environment.
 
+Use `sentinel doctor` to check the local state path, configured adapters,
+Telegram credentials, and scheduler without sending a notification.
+
 ## Safe hook setup
 
 Run `sentinel init --detect --dry-run` to preview configuration for detected
@@ -91,8 +94,7 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Windows scheduler installation and `doctor` workflows.
-2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
+1. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
 
 The local CLI will remain useful without Sentinel Cloud.
