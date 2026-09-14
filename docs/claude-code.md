@@ -24,8 +24,8 @@ immediately and creates a durable `reset_available` delivery for that inferred
 time. If Sentinel has no active locally observed window, it only sends the
 rate-limit alert with `unknown` timing.
 
-Run `sentinel run-due` from a platform scheduler to deliver the later reset
-notification. The upcoming scheduler installer will automate that step.
+Run `sentinel scheduler install` to install the minute-level local runner that
+delivers the later reset notification on macOS or Linux.
 
 ## Hook configuration
 

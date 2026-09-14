@@ -80,3 +80,16 @@ class CliTests(unittest.TestCase):
                     self.assertEqual(main(["run-due", "--dry-run"]), 0)
 
         self.assertEqual(json.loads(output.getvalue())["deliveries"][0]["outcome"], "would_deliver")
+
+    def test_scheduler_install_dry_run_is_safe(self) -> None:
+        with TemporaryDirectory() as directory:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(
+                    main(["scheduler", "install", "--dry-run", "--home", directory]), 0
+                )
+
+        result = json.loads(output.getvalue())
+        self.assertTrue(result["changed"])
+        self.assertFalse(result["activated"])
+        self.assertTrue(result["dry_run"])
