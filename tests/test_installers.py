@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from agent_sentinel.cli import main
-from agent_sentinel.installers.hooks import apply_hooks, detect_adapters
+from agent_sentinel.installers.hooks import apply_hooks, detect_adapters, remove_hooks
 
 
 class HookInstallerTests(unittest.TestCase):
@@ -66,3 +66,27 @@ class HookInstallerTests(unittest.TestCase):
             self.assertEqual({entry["adapter"] for entry in result["configured"]}, {"claude-code", "gemini-cli"})
             self.assertEqual(claude.read_text(), '{"permissions":{"allow":["Read"]}}\n')
             self.assertEqual(gemini.read_text(), '{"permissions":{"allow":["Read"]}}\n')
+
+    def test_uninstall_removes_only_sentinel_commands_and_keeps_other_hooks(self) -> None:
+        with TemporaryDirectory() as directory:
+            home = Path(directory)
+            settings = self._settings(home, ".claude")
+            target = detect_adapters(home)[0]
+            apply_hooks(target)
+            configured = json.loads(settings.read_text())
+            configured["hooks"]["Stop"][0]["hooks"].append(
+                {"type": "command", "command": "my-stop-observer"}
+            )
+            settings.write_text(json.dumps(configured))
+
+            result = remove_hooks(target)
+
+            self.assertTrue(result.changed)
+            assert result.backup_path is not None
+            remaining = json.loads(settings.read_text())
+            self.assertEqual(
+                remaining["hooks"]["Stop"][0]["hooks"],
+                [{"type": "command", "command": "my-stop-observer"}],
+            )
+            self.assertNotIn("PermissionRequest", remaining["hooks"])
+            self.assertFalse(remove_hooks(target).changed)

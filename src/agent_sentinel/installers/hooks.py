@@ -75,6 +75,24 @@ def _load_settings(path: Path) -> dict[str, Any]:
     return loaded
 
 
+def _write_with_backup(path: Path, settings: dict[str, Any]) -> Path:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    backup = path.with_name(f"{path.name}.agent-sentinel.{stamp}.bak")
+    sequence = 1
+    while backup.exists():
+        backup = path.with_name(f"{path.name}.agent-sentinel.{stamp}.{sequence}.bak")
+        sequence += 1
+    backup.write_bytes(path.read_bytes())
+    temporary = path.with_suffix(".json.agent-sentinel.tmp")
+    try:
+        temporary.write_text(json.dumps(settings, indent=2) + "\n")
+        os.replace(temporary, path)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
+    return backup
+
+
 def apply_hooks(target: AdapterTarget, dry_run: bool = False) -> InstallResult:
     """Append only missing Sentinel command groups and retain a full backup."""
     settings = _load_settings(target.settings_path)
@@ -92,21 +110,42 @@ def apply_hooks(target: AdapterTarget, dry_run: bool = False) -> InstallResult:
     if not changed or dry_run:
         return InstallResult(target.name, target.settings_path, changed, None)
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    backup = target.settings_path.with_name(f"{target.settings_path.name}.agent-sentinel.{stamp}.bak")
-    sequence = 1
-    while backup.exists():
-        backup = target.settings_path.with_name(
-            f"{target.settings_path.name}.agent-sentinel.{stamp}.{sequence}.bak"
-        )
-        sequence += 1
-    original = target.settings_path.read_bytes()
-    backup.write_bytes(original)
-    temporary = target.settings_path.with_suffix(".json.agent-sentinel.tmp")
-    try:
-        temporary.write_text(json.dumps(settings, indent=2) + "\n")
-        os.replace(temporary, target.settings_path)
-    except OSError:
-        temporary.unlink(missing_ok=True)
-        raise
+    backup = _write_with_backup(target.settings_path, settings)
+    return InstallResult(target.name, target.settings_path, True, backup)
+
+
+def remove_hooks(target: AdapterTarget, dry_run: bool = False) -> InstallResult:
+    """Remove Sentinel commands only, retaining other commands in each group."""
+    settings = _load_settings(target.settings_path)
+    hooks = settings.get("hooks", {})
+    command = "sentinel-claude-hook" if target.name == "claude-code" else "sentinel-gemini-hook"
+    changed = False
+    for event, groups in list(hooks.items()):
+        if not isinstance(groups, list):
+            raise ValueError(f"hooks.{event} in {target.settings_path} must be a JSON array")
+        retained_groups = []
+        for group in groups:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                retained_groups.append(group)
+                continue
+            retained_hooks = [
+                hook
+                for hook in group["hooks"]
+                if not (isinstance(hook, dict) and hook.get("command") == command)
+            ]
+            if len(retained_hooks) == len(group["hooks"]):
+                retained_groups.append(group)
+            elif retained_hooks:
+                retained_groups.append({**group, "hooks": retained_hooks})
+                changed = True
+            else:
+                changed = True
+        if retained_groups:
+            hooks[event] = retained_groups
+        elif groups:
+            del hooks[event]
+
+    if not changed or dry_run:
+        return InstallResult(target.name, target.settings_path, changed, None)
+    backup = _write_with_backup(target.settings_path, settings)
     return InstallResult(target.name, target.settings_path, True, backup)

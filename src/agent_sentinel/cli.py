@@ -13,7 +13,7 @@ from .channels import TelegramChannel
 from .core.models import Confidence, Event, EventKind
 from .core.scheduler import LocalScheduler
 from .core.store import EventStore
-from .installers import apply_hooks, detect_adapters
+from .installers import apply_hooks, detect_adapters, remove_hooks
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--adapter", choices=["claude-code", "gemini-cli"], action="append")
     init.add_argument("--dry-run", action="store_true", help="Show changes without editing settings")
     init.add_argument("--home", help="Override home directory, useful for automation and tests")
+
+    uninstall = subcommands.add_parser("uninstall", help="Safely remove Sentinel hook configuration")
+    uninstall.add_argument("--detect", action="store_true", help="Remove hooks from every detected supported CLI")
+    uninstall.add_argument("--adapter", choices=["claude-code", "gemini-cli"], action="append")
+    uninstall.add_argument("--dry-run", action="store_true", help="Show changes without editing settings")
+    uninstall.add_argument("--home", help="Override home directory, useful for automation and tests")
     return parser
 
 
@@ -190,12 +196,44 @@ def _init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _uninstall(args: argparse.Namespace) -> int:
+    home = Path(args.home).expanduser() if args.home else None
+    detected = detect_adapters(home)
+    requested = set(args.adapter or [])
+    targets = [target for target in detected if args.detect or target.name in requested]
+    if requested:
+        missing = requested - {target.name for target in detected}
+        if missing:
+            raise ValueError(f"settings file not found for: {', '.join(sorted(missing))}")
+    results = [remove_hooks(target, args.dry_run) for target in targets]
+    print(
+        json.dumps(
+            {
+                "uninstalled": [
+                    {
+                        "adapter": result.adapter,
+                        "settings_path": str(result.settings_path),
+                        "changed": result.changed,
+                        "backup_path": str(result.backup_path) if result.backup_path else None,
+                    }
+                    for result in results
+                ],
+                "dry_run": args.dry_run,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
             return _init(args)
+        if args.command == "uninstall":
+            return _uninstall(args)
         store = EventStore()
         if args.command == "emit":
             return _emit(args, store)

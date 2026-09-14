@@ -55,6 +55,10 @@ Claude Code and Gemini CLI settings. Remove `--dry-run` to apply only the
 missing Agent Sentinel hook groups. Existing configuration is preserved and a
 timestamped backup is written beside each changed settings file.
 
+Run `sentinel uninstall --detect --dry-run` to preview removal. The real
+command removes only Agent Sentinel commands, retains other hooks in the same
+group, and creates another timestamped backup before it writes.
+
 Runtime state defaults to `~/.agent-sentinel/state.sqlite3`. Set
 `AGENT_SENTINEL_STATE` to use another path, for example in tests or a managed
 installation.
@@ -73,7 +77,7 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Platform scheduler installation, `doctor`, and `uninstall` workflows for
+1. Platform scheduler installation and `doctor` workflows for
    macOS, Linux, and Windows.
 2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
