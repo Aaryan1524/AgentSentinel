@@ -5,12 +5,20 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
-from agent_sentinel.core.runtime import record_and_notify
+from agent_sentinel.core.runtime import (
+    record_and_notify,
+    schedule_usage_window_reset,
+    usage_window_reset_event_id,
+)
+from agent_sentinel.core.store import EventStore, UsageWindow
 
 AGENT_NAME = "gemini-cli"
+WINDOW_KEY = "account"
+WINDOW_DURATION = timedelta(hours=5)
 
 
 def _event_id(payload: dict[str, Any]) -> str:
@@ -26,12 +34,17 @@ def _metadata(payload: dict[str, Any]) -> dict[str, str]:
     return metadata
 
 
-def event_from_payload(payload: dict[str, Any]) -> Event | None:
+def event_from_payload(
+    payload: dict[str, Any],
+    *,
+    usage_window: UsageWindow | None = None,
+    occurred_at: datetime | None = None,
+) -> Event | None:
     """Translate Gemini CLI lifecycle and notification hooks.
 
-    Gemini CLI does not publish a quota-reset timestamp in its hook contract.
-    A rate-limit-looking notification is useful as an immediate alert, but it
-    remains an unknown-timing event.
+    ``BeforeAgent`` starts a user-configured five-hour rolling-window estimate.
+    A later rate limit in that live window creates an inferred, never exact,
+    reset timestamp.
     """
     hook_event = payload.get("hook_event_name")
     kind: EventKind | None = None
@@ -46,6 +59,12 @@ def event_from_payload(payload: dict[str, Any]) -> Event | None:
         if "rate limit" in notification_message.lower():
             kind = EventKind.RATE_LIMITED
             message = "Gemini CLI is rate limited."
+            if usage_window is not None:
+                metadata["window_started_at"] = usage_window.started_at.isoformat()
+                metadata["window_duration_seconds"] = int(WINDOW_DURATION.total_seconds())
+                metadata["usage_window_reset_event_id"] = usage_window_reset_event_id(
+                    AGENT_NAME, usage_window
+                )
         else:
             kind = EventKind.NEEDS_USER_ACTION
             message = "Gemini CLI needs your attention."
@@ -53,10 +72,19 @@ def event_from_payload(payload: dict[str, Any]) -> Event | None:
     if kind is None:
         return None
 
+    confidence = Confidence.UNKNOWN
+    reset_at = None
+    if kind is EventKind.RATE_LIMITED and usage_window is not None:
+        confidence = Confidence.INFERRED
+        reset_at = usage_window.reset_at
+        message = "Gemini CLI is rate limited; reset time is inferred from its rolling window."
+
     return Event.create(
         agent=AGENT_NAME,
         kind=kind,
-        confidence=Confidence.UNKNOWN,
+        occurred_at=occurred_at,
+        confidence=confidence,
+        reset_at=reset_at,
         message=message,
         metadata=metadata,
         event_id=_event_id(payload),
@@ -69,9 +97,20 @@ def main() -> int:
         payload = json.load(sys.stdin)
         if not isinstance(payload, dict):
             return 0
-        event = event_from_payload(payload)
+        store = EventStore()
+        now = datetime.now(timezone.utc)
+        if payload.get("hook_event_name") == "BeforeAgent":
+            usage_window = store.begin_usage_window(AGENT_NAME, WINDOW_KEY, now, WINDOW_DURATION)
+            schedule_usage_window_reset(AGENT_NAME, usage_window, store)
+            return 0
+        usage_window = None
+        if payload.get("hook_event_name") == "Notification" and "rate limit" in str(
+            payload.get("message", "")
+        ).lower():
+            usage_window = store.active_usage_window(AGENT_NAME, WINDOW_KEY, now)
+        event = event_from_payload(payload, usage_window=usage_window, occurred_at=now)
         if event is not None:
-            record_and_notify(event)
+            record_and_notify(event, store)
     except (json.JSONDecodeError, OSError, ValueError, TypeError):
         return 0
     return 0

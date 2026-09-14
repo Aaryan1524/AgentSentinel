@@ -47,6 +47,7 @@ def _hook_groups(adapter: str) -> dict[str, list[dict[str, Any]]]:
         }
     if adapter == "gemini-cli":
         return {
+            "BeforeAgent": [{"matcher": "*", "hooks": [{"type": "command", "command": command}]}],
             "AfterAgent": [{"matcher": "*", "hooks": [{"type": "command", "command": command}]}],
             "Notification": [{"matcher": "*", "hooks": [{"type": "command", "command": command}]}],
         }
@@ -84,9 +85,13 @@ def _write_with_backup(path: Path, settings: dict[str, Any]) -> Path:
         backup = path.with_name(f"{path.name}.agent-sentinel.{stamp}.{sequence}.bak")
         sequence += 1
     backup.write_bytes(path.read_bytes())
+    if os.name == "posix":
+        os.chmod(backup, 0o600)
     temporary = path.with_suffix(".json.agent-sentinel.tmp")
     try:
         temporary.write_text(json.dumps(settings, indent=2) + "\n")
+        if os.name == "posix":
+            os.chmod(temporary, 0o600)
         os.replace(temporary, path)
     except OSError:
         temporary.unlink(missing_ok=True)

@@ -1,9 +1,9 @@
 # Agent Sentinel
 
-Agent Sentinel notifies you when an AI coding agent finishes work, needs an
-approval, hits a limit, or becomes available again. It is an open-source,
-local-first foundation for Claude Code, Gemini CLI, OpenCode, Codex, Aider,
-and other agent CLIs.
+Agent Sentinel is an open-source, local-first reset notifier for developers
+using Claude Code, Gemini CLI, Grok Build, and Codex CLI. It starts a
+five-hour usage-window estimate from the first prompt and sends a Telegram
+message when that window is expected to reset — even when the laptop is off.
 
 The project deliberately separates a reported event from a predicted reset:
 
@@ -15,16 +15,15 @@ The project deliberately separates a reported event from a predicted reset:
 
 ## Current status
 
-The current local-first build provides the portable event contract, a durable
-SQLite store, Claude Code, Gemini CLI, Codex, and Grok adapters, Telegram
-delivery, a local scheduler, and safe hook configuration for Claude and Gemini.
-No cloud account or provider token is needed for the core.
+The current build provides a durable SQLite store; Claude Code, Gemini CLI,
+Grok Build, and Codex CLI adapters; Telegram delivery; QStash delayed delivery;
+and safe hook configuration for Claude and Gemini. It does not require a
+Sentinel cloud account or an AI-provider API token.
 
-For Claude Code, Sentinel also restores the local five-hour rolling-window
-behavior: the first observed prompt starts an **inferred** window, a rate-limit
-hook alerts immediately, and Sentinel durably schedules a later
-`reset_available` notification. It never describes this inferred time as a
-provider-confirmed reset.
+Every supported adapter starts a five-hour rolling-window estimate from a
+reliable first-use signal. The reset alert is always marked **inferred**: the
+CLI itself did not provide a reset timestamp. A rate-limit event also creates
+an immediate alert, but never creates a duplicate reset message.
 
 ## Try the core
 
@@ -49,15 +48,39 @@ To send a recorded event to Telegram, set `AGENT_SENTINEL_TELEGRAM_BOT_TOKEN`
 and `AGENT_SENTINEL_TELEGRAM_CHAT_ID`, then run `sentinel notify --id <event-id>`.
 Use `--dry-run` to preview the notification without credentials or network use.
 
-For automatic adapter notifications, place those same values in
-`~/.agent-sentinel/secrets.env` (or set `AGENT_SENTINEL_SECRETS` to another
-file). Each supported adapter records a new event and immediately attempts
-Telegram delivery; an unavailable channel never blocks the originating agent.
+## Offline delivery with QStash
+
+For reset alerts while the computer is asleep or off, create an Upstash QStash
+token and store these values in `~/.agent-sentinel/secrets.env` (or set
+`AGENT_SENTINEL_SECRETS` to another file):
+
+```dotenv
+AGENT_SENTINEL_TELEGRAM_BOT_TOKEN=...
+AGENT_SENTINEL_TELEGRAM_CHAT_ID=...
+AGENT_SENTINEL_QSTASH_TOKEN=...
+```
+
+At the first prompt of a new window, Sentinel submits one deduplicated delayed
+Telegram request to QStash for five hours later. QStash retries the delivery;
+the original machine need not remain on. Sentinel keeps the local scheduler as
+a fallback if QStash is not configured or cannot be reached when the window
+starts. Keep this file private (`chmod 600 ~/.agent-sentinel/secrets.env`).
+
+The no-server default sends QStash directly to Telegram; that destination URL
+includes the Telegram bot token. Sentinel redacts the request body and headers
+from QStash logs, but a user who needs stronger separation should set
+`AGENT_SENTINEL_QSTASH_DESTINATION` to an HTTPS relay they control. The relay
+must accept the form-encoded `chat_id` and `text` fields and forward them to
+Telegram. A managed relay is an appropriate future Sentinel Cloud feature.
+
+Each supported adapter also records events and immediately attempts Telegram
+delivery for completion, attention, and rate-limit notifications; an
+unavailable channel never blocks the originating agent.
 
 Schedule a known future event locally with `sentinel schedule --id <event-id>
---at <ISO-8601 timestamp>`, then install the per-user delivery runner with
-`sentinel scheduler install`. It checks for due events once a minute on macOS
-and Linux. Each attempt and outcome is retained in local state and visible via
+--at <ISO-8601 timestamp>`, then install the per-user fallback delivery runner
+with `sentinel scheduler install`. It checks for due events once a minute on
+macOS, Linux, and Windows. Each attempt and outcome is retained in local state and visible via
 `sentinel deliveries --json`; failed delivery remains pending for retry.
 The installer resolves the currently installed `sentinel` executable; pass
 `--executable /absolute/path/to/sentinel` when using a nonstandard environment.
@@ -113,6 +136,5 @@ See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
 See [Gemini CLI adapter setup](docs/gemini-cli.md) for its supported events.
 See [Codex setup](docs/codex.md), [Grok setup](docs/grok.md), and the full
 [integration matrix](docs/integration-matrix.md) for adapter support status.
-See [local scheduler setup](docs/local-scheduler.md) for durable reset delivery.
-OpenCode and Aider setup are available in [the OpenCode guide](docs/opencode.md)
-and [the Aider guide](docs/aider.md).
+See [offline delivery setup](docs/local-scheduler.md) for QStash and local
+fallback behavior.

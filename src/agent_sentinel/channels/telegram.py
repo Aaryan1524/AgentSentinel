@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,11 +28,17 @@ class TelegramChannel:
             os.environ.get("AGENT_SENTINEL_SECRETS", "~/.agent-sentinel/secrets.env")
         ).expanduser()
         if secrets_path.exists():
+            if os.name == "posix" and secrets_path.stat().st_uid == os.geteuid():
+                mode = stat.S_IMODE(secrets_path.stat().st_mode)
+                if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                    os.chmod(secrets_path, 0o600)
             for line in secrets_path.read_text().splitlines():
                 key, separator, value = line.partition("=")
                 if separator and key.strip() in {
                     "AGENT_SENTINEL_TELEGRAM_BOT_TOKEN",
                     "AGENT_SENTINEL_TELEGRAM_CHAT_ID",
+                    "AGENT_SENTINEL_QSTASH_TOKEN",
+                    "AGENT_SENTINEL_QSTASH_DESTINATION",
                 }:
                     os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
         return cls(

@@ -104,3 +104,4 @@ class CliTests(unittest.TestCase):
         result = json.loads(output.getvalue())
         self.assertFalse(result["healthy"])
         self.assertIn("telegram", {check["name"] for check in result["checks"]})
+        self.assertIn("qstash", {check["name"] for check in result["checks"]})

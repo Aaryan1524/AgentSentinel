@@ -72,19 +72,23 @@ class ClaudeCodeAdapterTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kind, EventKind.AGENT_FINISHED)
 
-    def test_prompt_then_rate_limit_records_an_inferred_reset_and_schedule(self) -> None:
+    def test_prompt_then_rate_limit_uses_the_reset_queued_at_window_start(self) -> None:
         with TemporaryDirectory() as directory:
             state_path = str(Path(directory) / "state.sqlite3")
             with patch.dict(os.environ, {"AGENT_SENTINEL_STATE": state_path}):
-                with patch("sys.stdin", io.StringIO('{"hook_event_name":"UserPromptSubmit"}')):
-                    self.assertEqual(main(), 0)
-                payload = '{"hook_event_name":"StopFailure","error":"rate_limit"}'
-                with patch("sys.stdin", io.StringIO(payload)):
-                    self.assertEqual(main(), 0)
+                with patch(
+                    "agent_sentinel.adapters.claude_code.schedule_usage_window_reset",
+                    return_value="claude-window-reset-1",
+                ) as schedule_reset:
+                    with patch("sys.stdin", io.StringIO('{"hook_event_name":"UserPromptSubmit"}')):
+                        self.assertEqual(main(), 0)
+                    payload = '{"hook_event_name":"StopFailure","error":"rate_limit"}'
+                    with patch("sys.stdin", io.StringIO(payload)):
+                        self.assertEqual(main(), 0)
                 store = EventStore()
                 limited = next(event for event in store.recent() if event.kind is EventKind.RATE_LIMITED)
-                scheduled = store.scheduled(f"{limited.event_id}-reset-available")
 
         self.assertEqual(limited.confidence, Confidence.INFERRED)
         self.assertIsNotNone(limited.reset_at)
-        self.assertIsNotNone(scheduled)
+        self.assertTrue(limited.metadata["usage_window_reset_event_id"].startswith("claude-code-window-reset-"))
+        schedule_reset.assert_called_once()

@@ -3,6 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
+import os
+import stat
 
 from agent_sentinel.channels.telegram import TelegramChannel
 from agent_sentinel.core.models import Confidence, Event
@@ -50,6 +52,8 @@ class TelegramChannelTests(unittest.TestCase):
             path.write_text("AGENT_SENTINEL_TELEGRAM_BOT_TOKEN=file-token\nAGENT_SENTINEL_TELEGRAM_CHAT_ID=file-chat\n")
             with patch.dict("os.environ", {"AGENT_SENTINEL_SECRETS": str(path)}, clear=True):
                 channel = TelegramChannel.from_environment()
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
 
         self.assertEqual(channel.bot_token, "file-token")
         self.assertEqual(channel.chat_id, "file-chat")
