@@ -35,3 +35,12 @@ class EventStoreTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, "at least 1"):
                 EventStore(Path(directory) / "state.sqlite3").recent(0)
+
+    def test_get_returns_a_stored_event_or_none(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = EventStore(Path(directory) / "state.sqlite3")
+            event = Event.create(agent="gemini-cli", kind="agent_finished", event_id="event-1")
+            store.record(event)
+
+            self.assertEqual(store.get("event-1"), event)
+            self.assertIsNone(store.get("missing"))
