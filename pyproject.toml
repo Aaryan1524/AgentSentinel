@@ -23,6 +23,7 @@ sentinel-claude-hook = "agent_sentinel.adapters.claude_code:main"
 sentinel-gemini-hook = "agent_sentinel.adapters.gemini_cli:main"
 sentinel-codex-notify = "agent_sentinel.adapters.codex:main"
 sentinel-grok-hook = "agent_sentinel.adapters.grok:main"
+sentinel-aider-notify = "agent_sentinel.adapters.aider:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

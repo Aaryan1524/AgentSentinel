@@ -96,3 +96,5 @@ See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
 See [Gemini CLI adapter setup](docs/gemini-cli.md) for its supported events.
 See [Codex setup](docs/codex.md), [Grok setup](docs/grok.md), and the full
 [integration matrix](docs/integration-matrix.md) for adapter support status.
+OpenCode and Aider setup are available in [the OpenCode guide](docs/opencode.md)
+and [the Aider guide](docs/aider.md).
