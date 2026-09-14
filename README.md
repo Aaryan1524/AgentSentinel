@@ -20,6 +20,12 @@ SQLite store, Claude Code, Gemini CLI, Codex, and Grok adapters, Telegram
 delivery, a local scheduler, and safe hook configuration for Claude and Gemini.
 No cloud account or provider token is needed for the core.
 
+For Claude Code, Sentinel also restores the local five-hour rolling-window
+behavior: the first observed prompt starts an **inferred** window, a rate-limit
+hook alerts immediately, and Sentinel durably schedules a later
+`reset_available` notification. It never describes this inferred time as a
+provider-confirmed reset.
+
 ## Try the core
 
 Requires Python 3.10+.
@@ -42,6 +48,11 @@ sentinel status --json
 To send a recorded event to Telegram, set `AGENT_SENTINEL_TELEGRAM_BOT_TOKEN`
 and `AGENT_SENTINEL_TELEGRAM_CHAT_ID`, then run `sentinel notify --id <event-id>`.
 Use `--dry-run` to preview the notification without credentials or network use.
+
+For automatic adapter notifications, place those same values in
+`~/.agent-sentinel/secrets.env` (or set `AGENT_SENTINEL_SECRETS` to another
+file). Each supported adapter records a new event and immediately attempts
+Telegram delivery; an unavailable channel never blocks the originating agent.
 
 Schedule a known future event locally with `sentinel schedule --id <event-id>
 --at <ISO-8601 timestamp>`, then run `sentinel run-due` from your platform's
@@ -96,3 +107,5 @@ See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
 See [Gemini CLI adapter setup](docs/gemini-cli.md) for its supported events.
 See [Codex setup](docs/codex.md), [Grok setup](docs/grok.md), and the full
 [integration matrix](docs/integration-matrix.md) for adapter support status.
+OpenCode and Aider setup are available in [the OpenCode guide](docs/opencode.md)
+and [the Aider guide](docs/aider.md).

@@ -6,12 +6,12 @@ detection.
 
 | Agent | Integration | Finished / attention | Rate limit timing |
 | --- | --- | --- | --- |
-| Claude Code | Native command hooks | Supported | `unknown` until a documented timestamp is available |
+| Claude Code | Native command hooks | Supported | Five-hour `inferred` reset from the first locally observed prompt; otherwise `unknown` |
 | Gemini CLI | Native command hooks | Supported | `unknown` |
 | Codex CLI | User-level `notify` command | Completion and attention bridge | `unknown` |
 | Grok Build | Native command hooks | Supported | `unknown` |
-| OpenCode | Plugin event surface | Plugin template planned | Provider-dependent; do not predict |
-| Aider | Custom notification command | External command bridge planned | Not exposed |
+| OpenCode | Plugin event surface | Supported via plugin template | Provider-dependent; do not predict |
+| Aider | Custom notification command | Supported | Not exposed |
 | Cursor, Cline, Windsurf | Research required | Do not advertise as supported yet | Not exposed |
 
 ## Why the confidence rule matters

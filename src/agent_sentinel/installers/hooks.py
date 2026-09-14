@@ -37,6 +37,7 @@ def _hook_groups(adapter: str) -> dict[str, list[dict[str, Any]]]:
     command = "sentinel-claude-hook" if adapter == "claude-code" else "sentinel-gemini-hook"
     if adapter == "claude-code":
         return {
+            "UserPromptSubmit": [{"hooks": [{"type": "command", "command": command}]}],
             "Stop": [{"hooks": [{"type": "command", "command": command}]}],
             "PermissionRequest": [{"hooks": [{"type": "command", "command": command}]}],
             "Notification": [{"hooks": [{"type": "command", "command": command}]}],
