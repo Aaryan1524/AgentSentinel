@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
-from agent_sentinel.core.store import EventStore
+from agent_sentinel.core.runtime import record_and_notify
 
 
 def event() -> Event:
@@ -19,7 +19,7 @@ def event() -> Event:
 
 def main() -> int:
     try:
-        EventStore().record(event())
+        record_and_notify(event())
     except (OSError, ValueError):
         return 0
     return 0

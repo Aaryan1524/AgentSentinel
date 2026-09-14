@@ -14,7 +14,7 @@ import sys
 from typing import Any
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
-from agent_sentinel.core.store import EventStore
+from agent_sentinel.core.runtime import record_and_notify
 
 AGENT_NAME = "claude-code"
 
@@ -78,7 +78,7 @@ def main() -> int:
             return 0
         event = event_from_payload(payload)
         if event is not None:
-            EventStore().record(event)
+            record_and_notify(event)
     except (json.JSONDecodeError, OSError, ValueError, TypeError):
         # Hooks are observational. Returning a failure could block a prompt or
         # create a noisy hook error in Claude Code, so fail safely instead.

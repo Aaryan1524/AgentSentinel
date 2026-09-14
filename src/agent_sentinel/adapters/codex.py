@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
-from agent_sentinel.core.store import EventStore
+from agent_sentinel.core.runtime import record_and_notify
 
 
 def _event_id(payload: dict[str, Any]) -> str:
@@ -49,7 +49,7 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         if isinstance(payload, dict):
-            EventStore().record(event_from_payload(payload))
+            record_and_notify(event_from_payload(payload))
     except (json.JSONDecodeError, OSError, ValueError, TypeError):
         return 0
     return 0

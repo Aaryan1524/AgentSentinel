@@ -43,6 +43,11 @@ To send a recorded event to Telegram, set `AGENT_SENTINEL_TELEGRAM_BOT_TOKEN`
 and `AGENT_SENTINEL_TELEGRAM_CHAT_ID`, then run `sentinel notify --id <event-id>`.
 Use `--dry-run` to preview the notification without credentials or network use.
 
+For automatic adapter notifications, place those same values in
+`~/.agent-sentinel/secrets.env` (or set `AGENT_SENTINEL_SECRETS` to another
+file). Each supported adapter records a new event and immediately attempts
+Telegram delivery; an unavailable channel never blocks the originating agent.
+
 Schedule a known future event locally with `sentinel schedule --id <event-id>
 --at <ISO-8601 timestamp>`, then run `sentinel run-due` from your platform's
 scheduler. Each attempt and outcome is retained in local state and visible via
