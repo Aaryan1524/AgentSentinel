@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
@@ -41,3 +43,13 @@ class TelegramChannelTests(unittest.TestCase):
         request = urlopen.call_args.args[0]
         self.assertIn("bottoken/sendMessage", request.full_url)
         self.assertIn(b"chat_id=chat", request.data)
+
+    def test_from_environment_loads_the_local_secret_file(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "secrets.env"
+            path.write_text("AGENT_SENTINEL_TELEGRAM_BOT_TOKEN=file-token\nAGENT_SENTINEL_TELEGRAM_CHAT_ID=file-chat\n")
+            with patch.dict("os.environ", {"AGENT_SENTINEL_SECRETS": str(path)}, clear=True):
+                channel = TelegramChannel.from_environment()
+
+        self.assertEqual(channel.bot_token, "file-token")
+        self.assertEqual(channel.chat_id, "file-chat")

@@ -7,6 +7,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 from agent_sentinel.core.models import Event
 
@@ -22,6 +23,17 @@ class TelegramChannel:
 
     @classmethod
     def from_environment(cls) -> "TelegramChannel":
+        secrets_path = Path(
+            os.environ.get("AGENT_SENTINEL_SECRETS", "~/.agent-sentinel/secrets.env")
+        ).expanduser()
+        if secrets_path.exists():
+            for line in secrets_path.read_text().splitlines():
+                key, separator, value = line.partition("=")
+                if separator and key.strip() in {
+                    "AGENT_SENTINEL_TELEGRAM_BOT_TOKEN",
+                    "AGENT_SENTINEL_TELEGRAM_CHAT_ID",
+                }:
+                    os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
         return cls(
             os.environ.get("AGENT_SENTINEL_TELEGRAM_BOT_TOKEN", ""),
             os.environ.get("AGENT_SENTINEL_TELEGRAM_CHAT_ID", ""),
