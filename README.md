@@ -15,10 +15,10 @@ The project deliberately separates a reported event from a predicted reset:
 
 ## Current status
 
-The first runnable slice provides the portable event contract, a durable local
-SQLite store, a Python CLI, Claude Code and Gemini CLI hook adapters, and an
-opt-in Telegram delivery command. Schedulers and safe installers are next; no
-cloud account or provider token is needed for the core.
+The current local-first build provides the portable event contract, a durable
+SQLite store, Claude Code, Gemini CLI, Codex, and Grok adapters, Telegram
+delivery, a local scheduler, and safe hook configuration for Claude and Gemini.
+No cloud account or provider token is needed for the core.
 
 ## Try the core
 
@@ -94,3 +94,5 @@ Licensed under [Apache-2.0](LICENSE).
 
 See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
 See [Gemini CLI adapter setup](docs/gemini-cli.md) for its supported events.
+See [Codex setup](docs/codex.md), [Grok setup](docs/grok.md), and the full
+[integration matrix](docs/integration-matrix.md) for adapter support status.
