@@ -1,7 +1,16 @@
 # Grok adapter
 
 Grok Build supports command hooks for turn lifecycle, notifications, and
-failures. Add this hook file at `~/.grok/hooks/agent-sentinel.json`:
+failures. Install the managed hook file with:
+
+```bash
+sentinel init --adapter grok-build --dry-run
+sentinel init --adapter grok-build
+```
+
+The installer creates or safely merges `~/.grok/hooks/agent-sentinel.json`,
+backs up an existing file before writing, and never adds the same Sentinel hook
+twice. The resulting hook file contains:
 
 ```json
 {

@@ -17,10 +17,13 @@ from .core.store import EventStore, default_state_path
 from .installers import (
     apply_hooks,
     detect_adapters,
+    install_codex_alias,
     install_scheduler,
+    remove_codex_alias,
     remove_hooks,
     scheduler_is_installed,
     scheduler_paths,
+    target_for_adapter,
     uninstall_scheduler,
 )
 
@@ -67,13 +70,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     init = subcommands.add_parser("init", help="Detect supported CLIs and safely add Sentinel hooks")
     init.add_argument("--detect", action="store_true", help="Configure every detected supported CLI")
-    init.add_argument("--adapter", choices=["claude-code", "gemini-cli"], action="append")
+    init.add_argument(
+        "--adapter",
+        choices=["claude-code", "gemini-cli", "grok-build", "codex-cli"],
+        action="append",
+    )
+    init.add_argument(
+        "--codex-alias",
+        action="store_true",
+        help="Explicitly add a managed zsh/bash alias so codex runs through sentinel-codex",
+    )
     init.add_argument("--dry-run", action="store_true", help="Show changes without editing settings")
     init.add_argument("--home", help="Override home directory, useful for automation and tests")
 
     uninstall = subcommands.add_parser("uninstall", help="Safely remove Sentinel hook configuration")
     uninstall.add_argument("--detect", action="store_true", help="Remove hooks from every detected supported CLI")
-    uninstall.add_argument("--adapter", choices=["claude-code", "gemini-cli"], action="append")
+    uninstall.add_argument(
+        "--adapter",
+        choices=["claude-code", "gemini-cli", "grok-build", "codex-cli"],
+        action="append",
+    )
+    uninstall.add_argument(
+        "--codex-alias",
+        action="store_true",
+        help="Remove only the managed Codex launcher alias from zsh/bash",
+    )
     uninstall.add_argument("--dry-run", action="store_true", help="Show changes without editing settings")
     uninstall.add_argument("--home", help="Override home directory, useful for automation and tests")
 
@@ -193,19 +214,35 @@ def _deliveries(args: argparse.Namespace, store: EventStore) -> int:
     return 0
 
 
+def _targets_for_request(args: argparse.Namespace, home: Path | None) -> list:
+    detected = detect_adapters(home)
+    available = {target.name: target for target in detected}
+    requested = list(dict.fromkeys(args.adapter or []))
+    targets = list(detected) if args.detect else []
+    for name in requested:
+        target = available.get(name)
+        if target is None:
+            if name in {"grok-build", "codex-cli"}:
+                target = target_for_adapter(name, home)
+            else:
+                raise ValueError(f"settings file not found for: {name}")
+        if target.name not in {entry.name for entry in targets}:
+            targets.append(target)
+    return targets
+
+
 def _init(args: argparse.Namespace) -> int:
     home = Path(args.home).expanduser() if args.home else None
-    detected = detect_adapters(home)
-    requested = set(args.adapter or [])
-    targets = [target for target in detected if args.detect or target.name in requested]
-    if requested:
-        missing = requested - {target.name for target in detected}
-        if missing:
-            raise ValueError(f"settings file not found for: {', '.join(sorted(missing))}")
+    targets = _targets_for_request(args, home)
     if not targets:
+        if args.codex_alias:
+            raise ValueError("--codex-alias requires --adapter codex-cli or a detected Codex CLI configuration")
         print(json.dumps({"configured": [], "message": "No supported CLI settings files detected."}))
         return 0
     results = [apply_hooks(target, args.dry_run) for target in targets]
+    if args.codex_alias and "codex-cli" not in {target.name for target in targets}:
+        raise ValueError("--codex-alias requires --adapter codex-cli or a detected Codex CLI configuration")
+    alias_result = install_codex_alias(home, dry_run=args.dry_run) if args.codex_alias else None
     print(
         json.dumps(
             {
@@ -218,6 +255,17 @@ def _init(args: argparse.Namespace) -> int:
                     }
                     for result in results
                 ],
+                "codex_alias": (
+                    {
+                        "profile_path": str(alias_result.profile_path),
+                        "changed": alias_result.changed,
+                        "backup_path": str(alias_result.backup_path)
+                        if alias_result.backup_path
+                        else None,
+                    }
+                    if alias_result
+                    else None
+                ),
                 "dry_run": args.dry_run,
             },
             sort_keys=True,
@@ -228,14 +276,11 @@ def _init(args: argparse.Namespace) -> int:
 
 def _uninstall(args: argparse.Namespace) -> int:
     home = Path(args.home).expanduser() if args.home else None
-    detected = detect_adapters(home)
-    requested = set(args.adapter or [])
-    targets = [target for target in detected if args.detect or target.name in requested]
-    if requested:
-        missing = requested - {target.name for target in detected}
-        if missing:
-            raise ValueError(f"settings file not found for: {', '.join(sorted(missing))}")
+    targets = _targets_for_request(args, home)
     results = [remove_hooks(target, args.dry_run) for target in targets]
+    if args.codex_alias and "codex-cli" not in {target.name for target in targets}:
+        raise ValueError("--codex-alias requires --adapter codex-cli or a detected Codex CLI configuration")
+    alias_result = remove_codex_alias(home, dry_run=args.dry_run) if args.codex_alias else None
     print(
         json.dumps(
             {
@@ -248,6 +293,17 @@ def _uninstall(args: argparse.Namespace) -> int:
                     }
                     for result in results
                 ],
+                "codex_alias": (
+                    {
+                        "profile_path": str(alias_result.profile_path),
+                        "changed": alias_result.changed,
+                        "backup_path": str(alias_result.backup_path)
+                        if alias_result.backup_path
+                        else None,
+                    }
+                    if alias_result
+                    else None
+                ),
                 "dry_run": args.dry_run,
             },
             sort_keys=True,
