@@ -89,3 +89,13 @@ class EventStore:
         finally:
             connection.close()
         return [Event.from_dict(json.loads(row["payload"])) for row in rows]
+
+    def get(self, event_id: str) -> Event | None:
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT payload FROM events WHERE event_id = ?", (event_id,)
+            ).fetchone()
+        finally:
+            connection.close()
+        return Event.from_dict(json.loads(row["payload"])) if row else None
