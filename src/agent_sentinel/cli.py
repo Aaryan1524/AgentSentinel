@@ -7,6 +7,7 @@ import json
 import sys
 from typing import Sequence
 
+from .channels import TelegramChannel
 from .core.models import Confidence, Event, EventKind
 from .core.store import EventStore
 
@@ -34,6 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
     status = subcommands.add_parser("status", help="Show recently recorded events")
     status.add_argument("--limit", type=int, default=20)
     status.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+
+    notify = subcommands.add_parser("notify", help="Deliver a stored event now")
+    notify.add_argument("--id", dest="event_id", required=True, help="Recorded event ID")
+    notify.add_argument("--channel", choices=["telegram"], default="telegram")
+    notify.add_argument("--dry-run", action="store_true", help="Render without sending")
     return parser
 
 
@@ -80,6 +86,19 @@ def _status(args: argparse.Namespace, store: EventStore) -> int:
     return 0
 
 
+def _notify(args: argparse.Namespace, store: EventStore) -> int:
+    event = store.get(args.event_id)
+    if event is None:
+        raise ValueError(f"event not found: {args.event_id}")
+    if args.dry_run:
+        print(TelegramChannel.render(event))
+        return 0
+    channel = TelegramChannel.from_environment()
+    channel.send(event)
+    print(json.dumps({"delivered": True, "event_id": event.event_id, "channel": args.channel}))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -87,7 +106,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         store = EventStore()
         if args.command == "emit":
             return _emit(args, store)
-        return _status(args, store)
+        if args.command == "status":
+            return _status(args, store)
+        return _notify(args, store)
     except (ValueError, OSError) as error:
         parser.error(str(error))
     return 2

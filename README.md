@@ -16,9 +16,9 @@ The project deliberately separates a reported event from a predicted reset:
 ## Current status
 
 The first runnable slice provides the portable event contract, a durable local
-SQLite store, a Python CLI, and Claude Code and Gemini CLI hook adapters. Notification
-channels and safe installers are next; no cloud account or provider token is
-needed for this core.
+SQLite store, a Python CLI, Claude Code and Gemini CLI hook adapters, and an
+opt-in Telegram delivery command. Schedulers and safe installers are next; no
+cloud account or provider token is needed for the core.
 
 ## Try the core
 
@@ -39,6 +39,10 @@ sentinel emit \
 sentinel status --json
 ```
 
+To send a recorded event to Telegram, set `AGENT_SENTINEL_TELEGRAM_BOT_TOKEN`
+and `AGENT_SENTINEL_TELEGRAM_CHAT_ID`, then run `sentinel notify --id <event-id>`.
+Use `--dry-run` to preview the notification without credentials or network use.
+
 Runtime state defaults to `~/.agent-sentinel/state.sqlite3`. Set
 `AGENT_SENTINEL_STATE` to use another path, for example in tests or a managed
 installation.
@@ -57,7 +61,7 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Telegram delivery plus local scheduler fallback.
+1. Local scheduler fallback and durable delivery history.
 2. Safe `sentinel init --detect`, `doctor`, and `uninstall` workflows for
    macOS, Linux, and Windows.
 4. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
