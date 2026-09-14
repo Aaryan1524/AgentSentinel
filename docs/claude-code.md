@@ -8,14 +8,24 @@ Sentinel never blocks a prompt, a permission decision, or an agent stop.
 
 | Claude Code hook | Agent Sentinel event |
 | --- | --- |
+| `UserPromptSubmit` | Starts a local Claude rolling-window estimate; no notification |
 | `Stop` | `agent_finished` |
 | `PermissionRequest` | `needs_user_action` |
 | `Notification` | `needs_user_action` |
-| `StopFailure` matched to `rate_limit` | `rate_limited` with `unknown` reset confidence |
+| `StopFailure` matched to `rate_limit` | `rate_limited`, then scheduled `reset_available` |
 
-Claude Code documents that `StopFailure` identifies a rate-limit error, but it
-does not document a reset timestamp in that hook payload. Sentinel therefore
-does not infer one yet.
+Claude Code's rate-limit hook does not provide a reset timestamp. Sentinel
+therefore treats a reset as an **inference**, never a provider-confirmed fact:
+it records the first `UserPromptSubmit` it observes in a five-hour rolling
+window, retains that window across hook processes, and calculates the reset
+from that start. Every additional prompt in the active window leaves the
+estimate unchanged. When `StopFailure` reports `rate_limit`, Sentinel notifies
+immediately and creates a durable `reset_available` delivery for that inferred
+time. If Sentinel has no active locally observed window, it only sends the
+rate-limit alert with `unknown` timing.
+
+Run `sentinel run-due` from a platform scheduler to deliver the later reset
+notification. The upcoming scheduler installer will automate that step.
 
 ## Hook configuration
 
@@ -27,6 +37,7 @@ file.
 ```json
 {
   "hooks": {
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "sentinel-claude-hook"}]}],
     "Stop": [{"hooks": [{"type": "command", "command": "sentinel-claude-hook"}]}],
     "PermissionRequest": [{"hooks": [{"type": "command", "command": "sentinel-claude-hook"}]}],
     "Notification": [{"hooks": [{"type": "command", "command": "sentinel-claude-hook"}]}],
@@ -38,5 +49,6 @@ file.
 }
 ```
 
-Until the installer lands, `sentinel-claude-hook` is the package command that
-runs the adapter. The installer will patch settings safely with backups.
+`sentinel init --adapter claude-code` safely adds the complete hook set with a
+timestamped backup. `sentinel-claude-hook` is the package command the adapter
+runs.

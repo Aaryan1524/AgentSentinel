@@ -11,12 +11,16 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
 from agent_sentinel.core.runtime import record_and_notify
+from agent_sentinel.core.store import EventStore, UsageWindow
 
 AGENT_NAME = "claude-code"
+WINDOW_KEY = "account"
+WINDOW_DURATION = timedelta(hours=5)
 
 
 def _event_id(payload: dict[str, Any]) -> str:
@@ -33,13 +37,17 @@ def _metadata(payload: dict[str, Any]) -> dict[str, str]:
     return metadata
 
 
-def event_from_payload(payload: dict[str, Any]) -> Event | None:
+def event_from_payload(
+    payload: dict[str, Any],
+    *,
+    usage_window: UsageWindow | None = None,
+    occurred_at: datetime | None = None,
+) -> Event | None:
     """Translate the documented, notification-worthy Claude Code hooks.
 
-    Claude Code does not document a reset timestamp in StopFailure payloads,
-    so rate-limit events intentionally remain ``unknown`` rather than making
-    a false prediction. Reset inference can be added only with a documented
-    rolling-window rule and a reliable window-start signal.
+    A ``UserPromptSubmit`` hook persists the first observed prompt in the
+    five-hour Claude rolling window. When a matching rate limit follows in
+    that live window, the reset is an *inferred* timestamp, never exact.
     """
     hook_event = payload.get("hook_event_name")
     kind: EventKind | None = None
@@ -56,14 +64,26 @@ def event_from_payload(payload: dict[str, Any]) -> Event | None:
         kind = EventKind.RATE_LIMITED
         message = "Claude Code is rate limited."
         metadata["error"] = "rate_limit"
+        if usage_window is not None:
+            metadata["window_started_at"] = usage_window.started_at.isoformat()
+            metadata["window_duration_seconds"] = int(WINDOW_DURATION.total_seconds())
 
     if kind is None:
         return None
 
+    confidence = Confidence.UNKNOWN
+    reset_at = None
+    if kind is EventKind.RATE_LIMITED and usage_window is not None:
+        confidence = Confidence.INFERRED
+        reset_at = usage_window.reset_at
+        message = "Claude Code is rate limited; reset time is inferred from its rolling window."
+
     return Event.create(
         agent=AGENT_NAME,
         kind=kind,
-        confidence=Confidence.UNKNOWN,
+        occurred_at=occurred_at,
+        confidence=confidence,
+        reset_at=reset_at,
         message=message,
         metadata=metadata,
         event_id=_event_id(payload),
@@ -76,9 +96,17 @@ def main() -> int:
         payload = json.load(sys.stdin)
         if not isinstance(payload, dict):
             return 0
-        event = event_from_payload(payload)
+        store = EventStore()
+        now = datetime.now(timezone.utc)
+        if payload.get("hook_event_name") == "UserPromptSubmit":
+            store.begin_usage_window(AGENT_NAME, WINDOW_KEY, now, WINDOW_DURATION)
+            return 0
+        usage_window = None
+        if payload.get("hook_event_name") == "StopFailure" and payload.get("error") == "rate_limit":
+            usage_window = store.active_usage_window(AGENT_NAME, WINDOW_KEY, now)
+        event = event_from_payload(payload, usage_window=usage_window, occurred_at=now)
         if event is not None:
-            record_and_notify(event)
+            record_and_notify(event, store)
     except (json.JSONDecodeError, OSError, ValueError, TypeError):
         # Hooks are observational. Returning a failure could block a prompt or
         # create a noisy hook error in Claude Code, so fail safely instead.

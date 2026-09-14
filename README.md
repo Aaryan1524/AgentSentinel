@@ -20,6 +20,12 @@ SQLite store, Claude Code, Gemini CLI, Codex, and Grok adapters, Telegram
 delivery, a local scheduler, and safe hook configuration for Claude and Gemini.
 No cloud account or provider token is needed for the core.
 
+For Claude Code, Sentinel also restores the local five-hour rolling-window
+behavior: the first observed prompt starts an **inferred** window, a rate-limit
+hook alerts immediately, and Sentinel durably schedules a later
+`reset_available` notification. It never describes this inferred time as a
+provider-confirmed reset.
+
 ## Try the core
 
 Requires Python 3.10+.

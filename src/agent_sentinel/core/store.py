@@ -22,6 +22,16 @@ class ScheduledEvent:
     last_error: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class UsageWindow:
+    """A provider-specific rolling usage window known to a local adapter."""
+
+    agent: str
+    window_key: str
+    started_at: datetime
+    reset_at: datetime
+
+
 def _parse_timestamp(value: str | datetime) -> datetime:
     parsed = value if isinstance(value, datetime) else datetime.fromisoformat(value)
     if parsed.tzinfo is None:
@@ -85,6 +95,18 @@ class EventStore:
                 "CREATE INDEX IF NOT EXISTS scheduled_events_due "
                 "ON scheduled_events (status, due_at)"
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS usage_windows (
+                    agent TEXT NOT NULL,
+                    window_key TEXT NOT NULL,
+                    started_at TEXT NOT NULL,
+                    reset_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (agent, window_key)
+                )
+                """
+            )
             connection.commit()
         finally:
             connection.close()
@@ -135,6 +157,72 @@ class EventStore:
         finally:
             connection.close()
         return Event.from_dict(json.loads(row["payload"])) if row else None
+
+    def begin_usage_window(
+        self,
+        agent: str,
+        window_key: str,
+        started_at: datetime,
+        duration: timedelta,
+    ) -> UsageWindow:
+        """Record the first reliable activity after a known window has expired.
+
+        Repeated prompt hooks during an active window must not slide its reset
+        estimate later. This makes first-prompt rolling-window inference
+        durable across short-lived hook processes.
+        """
+        start = _parse_timestamp(started_at)
+        if duration <= timedelta():
+            raise ValueError("usage-window duration must be positive")
+        reset = start + duration
+        now = datetime.now(timezone.utc).isoformat()
+        connection = self._connect()
+        try:
+            connection.execute(
+                """
+                INSERT INTO usage_windows (agent, window_key, started_at, reset_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(agent, window_key) DO UPDATE SET
+                    started_at = CASE
+                        WHEN usage_windows.reset_at <= excluded.started_at THEN excluded.started_at
+                        ELSE usage_windows.started_at
+                    END,
+                    reset_at = CASE
+                        WHEN usage_windows.reset_at <= excluded.started_at THEN excluded.reset_at
+                        ELSE usage_windows.reset_at
+                    END,
+                    updated_at = excluded.updated_at
+                """,
+                (agent, window_key, start.isoformat(), reset.isoformat(), now),
+            )
+            connection.commit()
+            row = connection.execute(
+                "SELECT * FROM usage_windows WHERE agent = ? AND window_key = ?",
+                (agent, window_key),
+            ).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            raise RuntimeError("usage window was not persisted")
+        return self._usage_window_from_row(row)
+
+    def active_usage_window(
+        self, agent: str, window_key: str, now: datetime
+    ) -> UsageWindow | None:
+        """Return the active window, never an already-expired estimate."""
+        current = _parse_timestamp(now)
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                """
+                SELECT * FROM usage_windows
+                WHERE agent = ? AND window_key = ? AND reset_at > ?
+                """,
+                (agent, window_key, current.isoformat()),
+            ).fetchone()
+        finally:
+            connection.close()
+        return self._usage_window_from_row(row) if row else None
 
     def schedule(self, event_id: str, due_at: datetime | str) -> ScheduledEvent:
         if self.get(event_id) is None:
@@ -254,4 +342,13 @@ class EventStore:
             attempt_count=row["attempt_count"],
             delivered_at=_parse_timestamp(row["delivered_at"]) if row["delivered_at"] else None,
             last_error=row["last_error"],
+        )
+
+    @staticmethod
+    def _usage_window_from_row(row: sqlite3.Row) -> UsageWindow:
+        return UsageWindow(
+            agent=row["agent"],
+            window_key=row["window_key"],
+            started_at=_parse_timestamp(row["started_at"]),
+            reset_at=_parse_timestamp(row["reset_at"]),
         )

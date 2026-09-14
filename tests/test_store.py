@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from agent_sentinel.core.models import Confidence, Event
 from agent_sentinel.core.store import EventStore
@@ -44,3 +45,26 @@ class EventStoreTests(unittest.TestCase):
 
             self.assertEqual(store.get("event-1"), event)
             self.assertIsNone(store.get("missing"))
+
+    def test_usage_window_keeps_its_first_start_until_it_expires(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = EventStore(Path(directory) / "state.sqlite3")
+            started = datetime(2026, 9, 14, 12, tzinfo=timezone.utc)
+            first = store.begin_usage_window(
+                "claude-code", "account", started, timedelta(hours=5)
+            )
+            repeated = store.begin_usage_window(
+                "claude-code", "account", started + timedelta(hours=1), timedelta(hours=5)
+            )
+            active = store.active_usage_window(
+                "claude-code", "account", started + timedelta(hours=4)
+            )
+            expired = store.active_usage_window(
+                "claude-code", "account", started + timedelta(hours=5)
+            )
+
+        self.assertEqual(first.started_at, started)
+        self.assertEqual(first.reset_at, started + timedelta(hours=5))
+        self.assertEqual(repeated, first)
+        self.assertEqual(active, first)
+        self.assertIsNone(expired)

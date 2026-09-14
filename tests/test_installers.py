@@ -32,6 +32,7 @@ class HookInstallerTests(unittest.TestCase):
             self.assertEqual(result.backup_path.read_text(), '{"permissions":{"allow":["Read"]}}\n')
             configured = json.loads(settings.read_text())
             self.assertEqual(configured["permissions"]["allow"], ["Read"])
+            self.assertIn("UserPromptSubmit", configured["hooks"])
             self.assertIn("StopFailure", configured["hooks"])
 
             repeat = apply_hooks(target)
@@ -88,5 +89,6 @@ class HookInstallerTests(unittest.TestCase):
                 remaining["hooks"]["Stop"][0]["hooks"],
                 [{"type": "command", "command": "my-stop-observer"}],
             )
+            self.assertNotIn("UserPromptSubmit", remaining["hooks"])
             self.assertNotIn("PermissionRequest", remaining["hooks"])
             self.assertFalse(remove_hooks(target).changed)
