@@ -15,10 +15,10 @@ The project deliberately separates a reported event from a predicted reset:
 
 ## Current status
 
-The first runnable slice provides the portable event contract, a durable local
-SQLite store, a Python CLI, Claude Code and Gemini CLI hook adapters, and an
-opt-in Telegram delivery command. Schedulers and safe installers are next; no
-cloud account or provider token is needed for the core.
+The current local-first build provides the portable event contract, a durable
+SQLite store, Claude Code, Gemini CLI, Codex, and Grok adapters, Telegram
+delivery, a local scheduler, and safe hook configuration for Claude and Gemini.
+No cloud account or provider token is needed for the core.
 
 ## Try the core
 
@@ -48,6 +48,17 @@ Schedule a known future event locally with `sentinel schedule --id <event-id>
 scheduler. Each attempt and outcome is retained in local state and visible via
 `sentinel deliveries --json`; failed delivery remains pending for retry.
 
+## Safe hook setup
+
+Run `sentinel init --detect --dry-run` to preview configuration for detected
+Claude Code and Gemini CLI settings. Remove `--dry-run` to apply only the
+missing Agent Sentinel hook groups. Existing configuration is preserved and a
+timestamped backup is written beside each changed settings file.
+
+Run `sentinel uninstall --detect --dry-run` to preview removal. The real
+command removes only Agent Sentinel commands, retains other hooks in the same
+group, and creates another timestamped backup before it writes.
+
 Runtime state defaults to `~/.agent-sentinel/state.sqlite3`. Set
 `AGENT_SENTINEL_STATE` to use another path, for example in tests or a managed
 installation.
@@ -66,9 +77,9 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Safe `sentinel init --detect`, `doctor`, and `uninstall` workflows for
+1. Platform scheduler installation and `doctor` workflows for
    macOS, Linux, and Windows.
-4. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
+2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
 
 The local CLI will remain useful without Sentinel Cloud.
@@ -83,3 +94,5 @@ Licensed under [Apache-2.0](LICENSE).
 
 See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
 See [Gemini CLI adapter setup](docs/gemini-cli.md) for its supported events.
+See [Codex setup](docs/codex.md), [Grok setup](docs/grok.md), and the full
+[integration matrix](docs/integration-matrix.md) for adapter support status.
