@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from typing import Sequence
 
 from .channels import TelegramChannel
 from .core.models import Confidence, Event, EventKind
+from .core.scheduler import LocalScheduler
 from .core.store import EventStore
 
 
@@ -40,6 +42,17 @@ def build_parser() -> argparse.ArgumentParser:
     notify.add_argument("--id", dest="event_id", required=True, help="Recorded event ID")
     notify.add_argument("--channel", choices=["telegram"], default="telegram")
     notify.add_argument("--dry-run", action="store_true", help="Render without sending")
+
+    schedule = subcommands.add_parser("schedule", help="Schedule a stored event for local delivery")
+    schedule.add_argument("--id", dest="event_id", required=True, help="Recorded event ID")
+    schedule.add_argument("--at", required=True, help="ISO-8601 delivery time with timezone")
+
+    run_due = subcommands.add_parser("run-due", help="Deliver all due locally scheduled events")
+    run_due.add_argument("--dry-run", action="store_true", help="Show due events without sending")
+
+    deliveries = subcommands.add_parser("deliveries", help="Show local delivery history")
+    deliveries.add_argument("--limit", type=int, default=20)
+    deliveries.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     return parser
 
 
@@ -99,6 +112,43 @@ def _notify(args: argparse.Namespace, store: EventStore) -> int:
     return 0
 
 
+def _schedule(args: argparse.Namespace, store: EventStore) -> int:
+    scheduled = store.schedule(args.event_id, args.at)
+    print(json.dumps({"event_id": scheduled.event_id, "due_at": scheduled.due_at.isoformat()}))
+    return 0
+
+
+def _run_due(args: argparse.Namespace, store: EventStore) -> int:
+    channel = TelegramChannel.from_environment() if not args.dry_run else None
+    scheduler = LocalScheduler(store, channel.send if channel else lambda _event: None)
+    results = scheduler.run_due(dry_run=args.dry_run)
+    print(json.dumps({"deliveries": [asdict(result) for result in results]}, sort_keys=True))
+    return 0
+
+
+def _deliveries(args: argparse.Namespace, store: EventStore) -> int:
+    history = [
+        {
+            "event_id": entry.event_id,
+            "due_at": entry.due_at.isoformat(),
+            "status": entry.status,
+            "attempt_count": entry.attempt_count,
+            "delivered_at": entry.delivered_at.isoformat() if entry.delivered_at else None,
+            "last_error": entry.last_error,
+        }
+        for entry in store.schedules(args.limit)
+    ]
+    if args.json:
+        print(json.dumps({"deliveries": history}, sort_keys=True))
+        return 0
+    if not history:
+        print("No scheduled deliveries yet.")
+        return 0
+    for entry in history:
+        print(f"{entry['due_at']}  {entry['event_id']}  {entry['status']}  attempts={entry['attempt_count']}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -108,7 +158,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _emit(args, store)
         if args.command == "status":
             return _status(args, store)
-        return _notify(args, store)
+        if args.command == "notify":
+            return _notify(args, store)
+        if args.command == "schedule":
+            return _schedule(args, store)
+        if args.command == "run-due":
+            return _run_due(args, store)
+        return _deliveries(args, store)
     except (ValueError, OSError) as error:
         parser.error(str(error))
     return 2

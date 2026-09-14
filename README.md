@@ -43,6 +43,11 @@ To send a recorded event to Telegram, set `AGENT_SENTINEL_TELEGRAM_BOT_TOKEN`
 and `AGENT_SENTINEL_TELEGRAM_CHAT_ID`, then run `sentinel notify --id <event-id>`.
 Use `--dry-run` to preview the notification without credentials or network use.
 
+Schedule a known future event locally with `sentinel schedule --id <event-id>
+--at <ISO-8601 timestamp>`, then run `sentinel run-due` from your platform's
+scheduler. Each attempt and outcome is retained in local state and visible via
+`sentinel deliveries --json`; failed delivery remains pending for retry.
+
 Runtime state defaults to `~/.agent-sentinel/state.sqlite3`. Set
 `AGENT_SENTINEL_STATE` to use another path, for example in tests or a managed
 installation.
@@ -61,8 +66,7 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Local scheduler fallback and durable delivery history.
-2. Safe `sentinel init --detect`, `doctor`, and `uninstall` workflows for
+1. Safe `sentinel init --detect`, `doctor`, and `uninstall` workflows for
    macOS, Linux, and Windows.
 4. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
