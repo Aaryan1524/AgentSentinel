@@ -1,4 +1,6 @@
 import json
+import os
+import stat
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -30,6 +32,9 @@ class HookInstallerTests(unittest.TestCase):
             self.assertTrue(result.changed)
             assert result.backup_path is not None
             self.assertEqual(result.backup_path.read_text(), '{"permissions":{"allow":["Read"]}}\n')
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(result.backup_path.stat().st_mode), 0o600)
+                self.assertEqual(stat.S_IMODE(settings.stat().st_mode), 0o600)
             configured = json.loads(settings.read_text())
             self.assertEqual(configured["permissions"]["allow"], ["Read"])
             self.assertIn("UserPromptSubmit", configured["hooks"])
@@ -38,6 +43,21 @@ class HookInstallerTests(unittest.TestCase):
             repeat = apply_hooks(target)
             self.assertFalse(repeat.changed)
             self.assertIsNone(repeat.backup_path)
+
+    def test_gemini_install_adds_the_pre_agent_window_hook(self) -> None:
+        with TemporaryDirectory() as directory:
+            home = Path(directory)
+            self._settings(home, ".gemini")
+            target = detect_adapters(home)[0]
+
+            apply_hooks(target)
+
+            configured = json.loads(target.settings_path.read_text())
+            self.assertIn("BeforeAgent", configured["hooks"])
+            self.assertEqual(
+                configured["hooks"]["BeforeAgent"][0]["hooks"][0]["command"],
+                "sentinel-gemini-hook",
+            )
 
     def test_invalid_settings_are_not_backed_up_or_overwritten(self) -> None:
         with TemporaryDirectory() as directory:

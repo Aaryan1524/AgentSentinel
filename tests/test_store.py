@@ -1,7 +1,10 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+import os
+import stat
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from agent_sentinel.core.models import Confidence, Event
 from agent_sentinel.core.store import EventStore
@@ -78,3 +81,16 @@ class EventStoreTests(unittest.TestCase):
             scheduled = store.schedule(event.event_id, "2026-09-14T17:00:00Z")
 
         self.assertEqual(scheduled.due_at.isoformat(), "2026-09-14T17:00:00+00:00")
+
+    def test_default_state_path_is_private_on_posix(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX file modes are not available")
+        with TemporaryDirectory() as directory:
+            home = Path(directory)
+            with patch.dict(os.environ, {}, clear=True), patch(
+                "agent_sentinel.core.store.Path.home", return_value=home
+            ):
+                store = EventStore()
+
+            self.assertEqual(stat.S_IMODE(store.path.parent.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(store.path.stat().st_mode), 0o600)

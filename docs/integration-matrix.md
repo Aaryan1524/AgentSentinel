@@ -6,17 +6,15 @@ detection.
 
 | Agent | Integration | Finished / attention | Rate limit timing |
 | --- | --- | --- | --- |
-| Claude Code | Native command hooks | Supported | Five-hour `inferred` reset from the first locally observed prompt; otherwise `unknown` |
-| Gemini CLI | Native command hooks | Supported | `unknown` |
-| Codex CLI | User-level `notify` command | Completion and attention bridge | `unknown` |
-| Grok Build | Native command hooks | Supported | `unknown` |
-| OpenCode | Plugin event surface | Supported via plugin template | Provider-dependent; do not predict |
-| Aider | Custom notification command | Supported | Not exposed |
-| Cursor, Cline, Windsurf | Research required | Do not advertise as supported yet | Not exposed |
+| Claude Code | Native command hooks | Supported | Five-hour `inferred` reset from first `UserPromptSubmit` |
+| Gemini CLI | Native command hooks | Supported | Five-hour `inferred` reset from first `BeforeAgent` |
+| Codex CLI | Sentinel launcher + `notify` | Completion and attention bridge | Five-hour `inferred` reset from first `sentinel-codex` invocation |
+| Grok Build | Native command hooks | Supported | Five-hour `inferred` reset from first `UserPromptSubmit` |
+| Other CLIs | Not in this release | Not advertised | Not advertised |
 
 ## Why the confidence rule matters
 
 A notification can be valuable even when a provider never exposes its quota
-reset. Sentinel emits a rate-limit event immediately, but only includes a
-timestamp when the provider supplies it or a documented rolling window can be
-anchored to a reliable start event.
+reset. Sentinel emits a rate-limit event immediately. The scheduled reset is a
+product estimate anchored to a reliable start event and is always marked
+`inferred`, never provider-confirmed.

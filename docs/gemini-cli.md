@@ -7,13 +7,14 @@ prints no output and exits successfully, so it does not modify the agent loop.
 
 | Gemini CLI hook | Agent Sentinel event |
 | --- | --- |
+| `BeforeAgent` | Starts a five-hour inferred reset timer; no immediate notification |
 | `AfterAgent` | `agent_finished` |
 | `Notification` | `needs_user_action` |
-| `Notification` whose message says rate limit | `rate_limited` with `unknown` reset confidence |
+| `Notification` whose message says rate limit | Immediate `rate_limited`; the existing reset timer remains `inferred` |
 
-Gemini CLI's documented hook schema supplies lifecycle and notification data,
-but does not promise a quota reset timestamp. Sentinel records a detected
-rate-limit notification immediately and deliberately makes no reset prediction.
+Gemini CLI's hook schema does not provide a provider reset timestamp. Sentinel
+therefore starts the product's five-hour estimate at `BeforeAgent`, marks the
+later reset delivery as `inferred`, and never describes it as exact.
 
 ## Hook configuration
 
@@ -23,6 +24,10 @@ Gemini CLI settings file. Do not overwrite existing hooks.
 ```json
 {
   "hooks": {
+    "BeforeAgent": [{
+      "matcher": "*",
+      "hooks": [{"type": "command", "command": "sentinel-gemini-hook"}]
+    }],
     "AfterAgent": [{
       "matcher": "*",
       "hooks": [{"type": "command", "command": "sentinel-gemini-hook"}]
@@ -35,6 +40,6 @@ Gemini CLI settings file. Do not overwrite existing hooks.
 }
 ```
 
-The current installer has not landed yet. `sentinel-gemini-hook` is provided
-by the installed package; the future installer will safely merge this setup
-and retain a backup of user configuration.
+`sentinel init --adapter gemini-cli` safely adds the complete hook set with a
+timestamped backup. Configure QStash as described in the main README for the
+timer to survive an offline computer.

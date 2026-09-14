@@ -1,7 +1,11 @@
 # Local scheduler
 
-Scheduled reset alerts stay on the machine. Install the per-user runner after
-you configure a delivery channel:
+QStash is the preferred offline delivery path: the first-prompt hook sends a
+one-time delayed Telegram request to QStash, which delivers it even if the
+computer is off. The local scheduler is the fallback when QStash is not
+configured or cannot be reached at window start.
+
+Install the per-user fallback runner after you configure Telegram:
 
 ```bash
 sentinel scheduler install

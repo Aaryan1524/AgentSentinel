@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agent-sentinel"
 version = "0.1.0"
-description = "Portable notifications for AI coding-agent events"
+description = "Offline usage-reset notifications for AI coding CLIs"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -22,6 +22,7 @@ sentinel = "agent_sentinel.cli:main"
 sentinel-claude-hook = "agent_sentinel.adapters.claude_code:main"
 sentinel-gemini-hook = "agent_sentinel.adapters.gemini_cli:main"
 sentinel-codex-notify = "agent_sentinel.adapters.codex:main"
+sentinel-codex = "agent_sentinel.adapters.codex:run_main"
 sentinel-grok-hook = "agent_sentinel.adapters.grok:main"
 sentinel-aider-notify = "agent_sentinel.adapters.aider:main"
 

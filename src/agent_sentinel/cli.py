@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Sequence
 
-from .channels import TelegramChannel
+from .channels import QStashChannel, TelegramChannel
 from .core.models import Confidence, Event, EventKind
 from .core.scheduler import LocalScheduler
 from .core.store import EventStore, default_state_path
@@ -317,6 +317,18 @@ def _doctor(args: argparse.Namespace) -> int:
         )
     else:
         checks.append({"name": "telegram", "status": "ok", "detail": "credentials configured"})
+    try:
+        QStashChannel.from_environment()
+    except (OSError, ValueError):
+        checks.append(
+            {
+                "name": "qstash",
+                "status": "warning",
+                "detail": "QStash is not configured; reset delivery needs this computer online.",
+            }
+        )
+    else:
+        checks.append({"name": "qstash", "status": "ok", "detail": "offline delivery configured"})
     adapters = detect_adapters(home)
     if adapters:
         for adapter in adapters:

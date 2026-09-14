@@ -1,11 +1,12 @@
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
-from agent_sentinel.core.runtime import record_and_notify
-from agent_sentinel.core.store import EventStore
+from agent_sentinel.core.runtime import record_and_notify, schedule_usage_window_reset
+from agent_sentinel.core.store import EventStore, UsageWindow
 
 
 class RuntimeTests(unittest.TestCase):
@@ -58,3 +59,22 @@ class RuntimeTests(unittest.TestCase):
         assert scheduled is not None
         self.assertEqual(scheduled.due_at.isoformat(), "2026-09-14T17:00:00+00:00")
         channel.send.assert_called_once_with(event)
+
+    def test_usage_window_queues_qstash_once_before_a_limit_is_hit(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = EventStore(Path(directory) / "state.sqlite3")
+            window = UsageWindow(
+                agent="gemini-cli",
+                window_key="account",
+                started_at=datetime(2026, 9, 14, 12, tzinfo=timezone.utc),
+                reset_at=datetime(2026, 9, 14, 17, tzinfo=timezone.utc),
+            )
+            qstash = unittest.mock.Mock()
+            with patch("agent_sentinel.core.runtime.QStashChannel.from_environment", return_value=qstash):
+                event_id = schedule_usage_window_reset("gemini-cli", window, store)
+                self.assertEqual(schedule_usage_window_reset("gemini-cli", window, store), event_id)
+
+            self.assertIsNotNone(store.get(event_id))
+            self.assertIsNone(store.scheduled(event_id))
+
+        qstash.schedule.assert_called_once()

@@ -50,9 +50,14 @@ class EventStore:
     """SQLite-backed event storage that survives a hook process exiting."""
 
     def __init__(self, path: Path | str | None = None) -> None:
+        self._uses_default_path = path is None and "AGENT_SENTINEL_STATE" not in os.environ
         self.path = Path(path) if path else default_state_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        if self._uses_default_path and os.name == "posix":
+            os.chmod(self.path.parent, 0o700)
         self._initialize()
+        if self._uses_default_path and os.name == "posix":
+            os.chmod(self.path, 0o600)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)

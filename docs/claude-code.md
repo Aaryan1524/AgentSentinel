@@ -24,8 +24,10 @@ immediately and creates a durable `reset_available` delivery for that inferred
 time. If Sentinel has no active locally observed window, it only sends the
 rate-limit alert with `unknown` timing.
 
-Run `sentinel scheduler install` to install the minute-level local runner that
-delivers the later reset notification on macOS or Linux.
+When QStash is configured, the `UserPromptSubmit` hook queues the reset alert
+off-device immediately, so it can arrive when this machine is off. Run
+`sentinel scheduler install` to retain a local fallback on macOS, Linux, or
+Windows when QStash is unavailable.
 
 ## Hook configuration
 

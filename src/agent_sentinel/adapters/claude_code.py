@@ -15,7 +15,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from agent_sentinel.core.models import Confidence, Event, EventKind
-from agent_sentinel.core.runtime import record_and_notify
+from agent_sentinel.core.runtime import (
+    record_and_notify,
+    schedule_usage_window_reset,
+    usage_window_reset_event_id,
+)
 from agent_sentinel.core.store import EventStore, UsageWindow
 
 AGENT_NAME = "claude-code"
@@ -67,6 +71,9 @@ def event_from_payload(
         if usage_window is not None:
             metadata["window_started_at"] = usage_window.started_at.isoformat()
             metadata["window_duration_seconds"] = int(WINDOW_DURATION.total_seconds())
+            metadata["usage_window_reset_event_id"] = usage_window_reset_event_id(
+                AGENT_NAME, usage_window
+            )
 
     if kind is None:
         return None
@@ -99,7 +106,8 @@ def main() -> int:
         store = EventStore()
         now = datetime.now(timezone.utc)
         if payload.get("hook_event_name") == "UserPromptSubmit":
-            store.begin_usage_window(AGENT_NAME, WINDOW_KEY, now, WINDOW_DURATION)
+            usage_window = store.begin_usage_window(AGENT_NAME, WINDOW_KEY, now, WINDOW_DURATION)
+            schedule_usage_window_reset(AGENT_NAME, usage_window, store)
             return 0
         usage_window = None
         if payload.get("hook_event_name") == "StopFailure" and payload.get("error") == "rate_limit":
