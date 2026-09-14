@@ -50,8 +50,8 @@ Use `--dry-run` to preview the notification without credentials or network use.
 
 ## Onboarding today
 
-The current release is safe and functional, but it is not yet a one-command
-installer. A user follows this path:
+The current release safely connects every supported CLI. A user follows this
+path:
 
 1. Install Agent Sentinel in a Python 3.10+ environment.
 2. Create a Telegram bot and identify the Telegram chat ID to receive alerts.
@@ -64,8 +64,8 @@ installer. A user follows this path:
 | --- | --- |
 | Claude Code | Run `sentinel init --adapter claude-code` to back up and add its hooks; add `--dry-run` to preview. |
 | Gemini CLI | Run `sentinel init --adapter gemini-cli` to back up and add its hooks; add `--dry-run` to preview. |
-| Grok Build | Add the documented JSON hook file at `~/.grok/hooks/agent-sentinel.json`. |
-| Codex CLI | Add its `notify` entry to `~/.codex/config.toml`, then invoke Codex through `sentinel-codex` or a shell alias. |
+| Grok Build | Run `sentinel init --adapter grok-build` to create or merge its managed JSON hook file. |
+| Codex CLI | Run `sentinel init --adapter codex-cli --codex-alias` to add `notify` and an explicit managed zsh/bash alias. |
 
 For Claude and Gemini together, use:
 
@@ -75,10 +75,11 @@ sentinel init --detect
 sentinel doctor
 ```
 
-The installer never overwrites an existing Claude or Gemini configuration: it
-only adds missing Sentinel hooks and creates a timestamped backup first. See
-the [Grok guide](docs/grok.md) and [Codex guide](docs/codex.md) for their
-current manual configuration.
+To include the optional Codex alias in a detected setup, add `--codex-alias`.
+Open a new terminal after alias installation. The installer never overwrites an
+existing configuration: it only adds missing Sentinel hooks and creates a
+timestamped backup first. If Codex already has a different `notify` command or
+shell alias, Sentinel refuses to replace it and reports the conflict instead.
 
 ### What happens after connection
 
@@ -157,8 +158,7 @@ that ID to make repeated hook delivery safe and idempotent.
 ## Roadmap
 
 1. Smooth local onboarding: an interactive `sentinel init` flow that writes
-   the secrets file, validates Telegram/QStash with user approval, and safely
-   connects all four supported CLIs.
+   the secrets file and validates Telegram/QStash with user approval.
 2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
 
