@@ -13,12 +13,13 @@ from typing import Sequence
 from .channels import TelegramChannel
 from .core.models import Confidence, Event, EventKind
 from .core.scheduler import LocalScheduler
-from .core.store import EventStore
+from .core.store import EventStore, default_state_path
 from .installers import (
     apply_hooks,
     detect_adapters,
     install_scheduler,
     remove_hooks,
+    scheduler_is_installed,
     scheduler_paths,
     uninstall_scheduler,
 )
@@ -92,6 +93,10 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall_scheduler_command.add_argument("--home", help="Override home directory, useful for automation and tests")
     status_scheduler = scheduler_commands.add_parser("status")
     status_scheduler.add_argument("--home", help="Override home directory, useful for automation and tests")
+
+    doctor = subcommands.add_parser("doctor", help="Check local notification setup without sending a message")
+    doctor.add_argument("--home", help="Override home directory, useful for automation and tests")
+    doctor.add_argument("--json", action="store_true", help="Emit machine-readable diagnostics")
     return parser
 
 
@@ -255,7 +260,11 @@ def _scheduler(args: argparse.Namespace) -> int:
     home = Path(args.home).expanduser() if getattr(args, "home", None) else None
     if args.scheduler_command == "status":
         paths = scheduler_paths(home)
-        print(json.dumps({"paths": [str(path) for path in paths], "installed": all(path.exists() for path in paths)}))
+        print(
+            json.dumps(
+                {"paths": [str(path) for path in paths], "installed": scheduler_is_installed(home)}
+            )
+        )
         return 0
     if args.scheduler_command == "install":
         executable = args.executable or shutil.which("sentinel") or "sentinel"
@@ -283,6 +292,63 @@ def _scheduler(args: argparse.Namespace) -> int:
     return 0
 
 
+def _doctor(args: argparse.Namespace) -> int:
+    home = Path(args.home).expanduser() if args.home else Path.home()
+    state_path = default_state_path()
+    if args.home:
+        state_path = home / ".agent-sentinel" / "state.sqlite3"
+    checks: list[dict[str, str]] = []
+    checks.append(
+        {
+            "name": "state_directory",
+            "status": "ok" if state_path.parent.exists() else "warning",
+            "detail": str(state_path),
+        }
+    )
+    try:
+        TelegramChannel.from_environment()
+    except (OSError, ValueError):
+        checks.append(
+            {
+                "name": "telegram",
+                "status": "warning",
+                "detail": "Telegram credentials are not configured.",
+            }
+        )
+    else:
+        checks.append({"name": "telegram", "status": "ok", "detail": "credentials configured"})
+    adapters = detect_adapters(home)
+    if adapters:
+        for adapter in adapters:
+            try:
+                has_sentinel_hook = "sentinel-" in adapter.settings_path.read_text()
+            except OSError:
+                has_sentinel_hook = False
+            checks.append(
+                {
+                    "name": f"adapter:{adapter.name}",
+                    "status": "ok" if has_sentinel_hook else "warning",
+                    "detail": str(adapter.settings_path),
+                }
+            )
+    else:
+        checks.append({"name": "adapters", "status": "warning", "detail": "no supported settings found"})
+    checks.append(
+        {
+            "name": "scheduler",
+            "status": "ok" if scheduler_is_installed(home) else "warning",
+            "detail": "installed" if scheduler_is_installed(home) else "not installed",
+        }
+    )
+    healthy = all(check["status"] == "ok" for check in checks)
+    if args.json:
+        print(json.dumps({"healthy": healthy, "checks": checks}, sort_keys=True))
+    else:
+        for check in checks:
+            print(f"{check['status'].upper():7} {check['name']}: {check['detail']}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -293,6 +359,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _uninstall(args)
         if args.command == "scheduler":
             return _scheduler(args)
+        if args.command == "doctor":
+            return _doctor(args)
         store = EventStore()
         if args.command == "emit":
             return _emit(args, store)

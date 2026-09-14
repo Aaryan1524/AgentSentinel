@@ -9,8 +9,9 @@ sentinel scheduler status
 ```
 
 On macOS, Sentinel writes and activates a `launchd` LaunchAgent. On Linux, it
-writes and enables a user `systemd` service and timer. Both run `sentinel
-run-due` once per minute. The command resolves the active `sentinel` executable;
+writes and enables a user `systemd` service and timer. On Windows, it creates a
+per-user Task Scheduler task. All run `sentinel run-due` once per minute. The
+command resolves the active `sentinel` executable;
 provide `--executable /absolute/path/to/sentinel` when your installation uses a
 nonstandard environment.
 
@@ -21,6 +22,3 @@ owned by Sentinel, use:
 ```bash
 sentinel scheduler uninstall
 ```
-
-Windows scheduler installation is not included yet. You can still run
-`sentinel run-due` from Task Scheduler until that adapter is added.

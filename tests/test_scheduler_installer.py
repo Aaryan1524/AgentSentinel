@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import plistlib
 import unittest
@@ -53,3 +54,34 @@ class SchedulerInstallerTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "unmanaged"):
                 uninstall_scheduler(home=home, system_name="Darwin")
+
+    def test_windows_task_is_created_without_replacing_an_unknown_task(self) -> None:
+        responses = iter(
+            [
+                subprocess.CompletedProcess([], 1, "", "not found"),
+                subprocess.CompletedProcess([], 0, "", ""),
+                subprocess.CompletedProcess([], 0, "<Command>sentinel.exe</Command><Arguments>run-due</Arguments>", ""),
+                subprocess.CompletedProcess([], 0, "", ""),
+            ]
+        )
+        commands = []
+
+        def runner(command, **_kwargs):
+            commands.append(command)
+            return next(responses)
+
+        with TemporaryDirectory() as directory:
+            home = Path(directory)
+            installed = install_scheduler(
+                home=home,
+                executable="C:\\Tools\\sentinel.exe",
+                system_name="Windows",
+                runner=runner,
+            )
+            removed = uninstall_scheduler(home=home, system_name="Windows", runner=runner)
+
+        self.assertTrue(installed.changed)
+        self.assertTrue(installed.activated)
+        self.assertTrue(removed.changed)
+        self.assertIn("/Create", commands[1])
+        self.assertIn("/Delete", commands[3])
