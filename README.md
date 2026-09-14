@@ -16,8 +16,9 @@ The project deliberately separates a reported event from a predicted reset:
 ## Current status
 
 The first runnable slice provides the portable event contract, a durable local
-SQLite store, and a Python CLI. Adapter, notification-channel, and installer
-PRs are next; no cloud account or provider token is needed for this core.
+SQLite store, a Python CLI, and a Claude Code hook adapter. Notification
+channels and safe installers are next; no cloud account or provider token is
+needed for this core.
 
 ## Try the core
 
@@ -56,7 +57,7 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Claude Code and Gemini CLI adapters.
+1. Gemini CLI adapter.
 2. Telegram delivery plus local scheduler fallback.
 3. Safe `sentinel init --detect`, `doctor`, and `uninstall` workflows for
    macOS, Linux, and Windows.
@@ -72,3 +73,5 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
 Licensed under [Apache-2.0](LICENSE).
+
+See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.
