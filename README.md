@@ -48,6 +48,45 @@ To send a recorded event to Telegram, set `AGENT_SENTINEL_TELEGRAM_BOT_TOKEN`
 and `AGENT_SENTINEL_TELEGRAM_CHAT_ID`, then run `sentinel notify --id <event-id>`.
 Use `--dry-run` to preview the notification without credentials or network use.
 
+## Onboarding today
+
+The current release is safe and functional, but it is not yet a one-command
+installer. A user follows this path:
+
+1. Install Agent Sentinel in a Python 3.10+ environment.
+2. Create a Telegram bot and identify the Telegram chat ID to receive alerts.
+3. Create an Upstash QStash token for offline delayed delivery.
+4. Put those three values in the private secrets file shown below.
+5. Connect the AI CLI they use.
+6. Run `sentinel doctor` to confirm the setup before their first prompt.
+
+| CLI | Current connection step |
+| --- | --- |
+| Claude Code | Run `sentinel init --adapter claude-code` to back up and add its hooks; add `--dry-run` to preview. |
+| Gemini CLI | Run `sentinel init --adapter gemini-cli` to back up and add its hooks; add `--dry-run` to preview. |
+| Grok Build | Add the documented JSON hook file at `~/.grok/hooks/agent-sentinel.json`. |
+| Codex CLI | Add its `notify` entry to `~/.codex/config.toml`, then invoke Codex through `sentinel-codex` or a shell alias. |
+
+For Claude and Gemini together, use:
+
+```bash
+sentinel init --detect --dry-run
+sentinel init --detect
+sentinel doctor
+```
+
+The installer never overwrites an existing Claude or Gemini configuration: it
+only adds missing Sentinel hooks and creates a timestamped backup first. See
+the [Grok guide](docs/grok.md) and [Codex guide](docs/codex.md) for their
+current manual configuration.
+
+### What happens after connection
+
+On the first reliable prompt signal, Sentinel creates one five-hour inferred
+usage window and immediately queues its reset notification with QStash. Later
+prompts in that window do not move the timer. A rate-limit message creates an
+immediate Telegram alert but does not create a duplicate reset alert.
+
 ## Offline delivery with QStash
 
 For reset alerts while the computer is asleep or off, create an Upstash QStash
@@ -117,7 +156,10 @@ that ID to make repeated hook delivery safe and idempotent.
 
 ## Roadmap
 
-1. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
+1. Smooth local onboarding: an interactive `sentinel init` flow that writes
+   the secrets file, validates Telegram/QStash with user approval, and safely
+   connects all four supported CLIs.
+2. Optional Sentinel Cloud: managed delivery, phone push, multi-machine sync,
    history, and team policies.
 
 The local CLI will remain useful without Sentinel Cloud.
