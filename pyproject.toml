@@ -20,6 +20,7 @@ classifiers = [
 [project.scripts]
 sentinel = "agent_sentinel.cli:main"
 sentinel-claude-hook = "agent_sentinel.adapters.claude_code:main"
+sentinel-gemini-hook = "agent_sentinel.adapters.gemini_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
