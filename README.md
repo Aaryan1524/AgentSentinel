@@ -103,6 +103,8 @@ The local CLI will remain useful without Sentinel Cloud.
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
+Public CI verifies the test suite on Python 3.10 through 3.13.
+
 Licensed under [Apache-2.0](LICENSE).
 
 See [Claude Code adapter setup](docs/claude-code.md) for the current hook map.

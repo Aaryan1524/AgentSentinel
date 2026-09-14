@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 from uuid import uuid4
 
 
-class EventKind(StrEnum):
+class EventKind(str, Enum):
     """Events an adapter can report, regardless of the originating CLI."""
 
     AGENT_FINISHED = "agent_finished"
@@ -18,7 +18,7 @@ class EventKind(StrEnum):
     RESET_AVAILABLE = "reset_available"
 
 
-class Confidence(StrEnum):
+class Confidence(str, Enum):
     """How reliable a reset timestamp is."""
 
     CONFIRMED = "confirmed"

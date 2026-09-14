@@ -33,7 +33,7 @@ class UsageWindow:
 
 
 def _parse_timestamp(value: str | datetime) -> datetime:
-    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         raise ValueError("scheduled timestamps must include a timezone")
     return parsed.astimezone(timezone.utc)
