@@ -68,3 +68,13 @@ class EventStoreTests(unittest.TestCase):
         self.assertEqual(repeated, first)
         self.assertEqual(active, first)
         self.assertIsNone(expired)
+
+    def test_schedule_accepts_a_utc_z_timestamp_on_all_supported_pythons(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = EventStore(Path(directory) / "state.sqlite3")
+            event = Event.create(agent="claude-code", kind="reset_available", event_id="reset-z")
+            store.record(event)
+
+            scheduled = store.schedule(event.event_id, "2026-09-14T17:00:00Z")
+
+        self.assertEqual(scheduled.due_at.isoformat(), "2026-09-14T17:00:00+00:00")
